@@ -1,0 +1,279 @@
+
+=======================================================================================
+
+http request 
+
+there are mainly 4 request we use
+GET -> fetch data
+POST -> create data 
+PUT -> modify data
+Delete -> delete data 
+
+------------------------------------------------------------------------------------
+get -> 
+
+@app.get("/hello")
+def hello():
+	return {"message" : "Hello from akash"}
+
+
+-------------------------------------------------------------------------------------
+post -> 
+
+
+from pydantic import BaseModel
+
+data = []                     -> using a list for temp storage in real case use DB
+class Data(BaseModel):        -> for post and put we need to create pydantic class which inherites the BaseModle class. 
+	id: int
+	name : str
+
+@app.post("/addData")
+def create(d : Data):         -> this "d" will have the data send to us by the body
+	data.append(d)        -> since we are using the instance of a pydantic class we can just direclty append it. the pydantic will do the formatig for                         				us automatically . Data is a pydantic class. this is the power of fastapi + pydantic 
+
+
+
+but what if the requestbody has different varibles names than our model 
+{ "serial": 23, "title": "The book" }
+
+then we need to do manual mapping and automatic mapping wont be possible 
+
+3 ways to do it 
+a) create a seperate model and then map it in the original model 
+class Seperate_Model(BaseModel):
+	serial : int
+	title : str
+
+@app.post("/addData")
+def create(d : Seperate_Model):         
+	mapped_data = Data( id = d.serial , name = d.title)
+	data.append(mapped_data)
+
+mainly used in production , and the protection of the pydantic remains 
+
+
+b) accept the raw dictionary from the req body
+from fastapi import Body
+
+@app.post("/create")
+def create(payload: dict = Body(...)):
+    mapped_data = Data(
+        id=payload["serial"],
+        name=payload["title"]
+    )
+
+    data.append(mapped_data)
+
+
+but this is not recommended to do in the production , no validation or anything is there
+
+
+c) using alias 
+modify the old model to have alias names 
+class Data(BaseModel):
+	id: int = Field(alias = "serial")
+	name : str = Field(alias = "title")
+
+@app.post("/addData")
+def create(d : Data):     
+	data.append(d)
+
+
+then the automatic mapping will work
+
+
+---
+
+note -> class Data(BaseModel):
+    id: int = Field(validation_alias=AliasChoices("id", "serial", "book_id"))
+    name: str = Field(validation_alias=AliasChoices("name", "title", "book_title"))
+this supports multiple names 
+
+
+note -> class Data(BaseModel):
+    id: int = Field(
+        validation_alias=AliasChoices("id", "serial"),
+        serialization_alias="book_id"
+    )
+Input accepts id or serial
+Output returns book_id
+
+-------------------------------------------------------------------------------------------------
+
+put -> 
+
+@app.put("/update/{id}")
+def update(id : int , d : Data):
+	for da in data:
+		if da.id == id: 
+			da.name = d.name
+
+
+---------------------------------------------------------------------------------------------------
+
+delete -> 
+@app.delete("/delete/{id}")
+def delete(id : int):
+	for da in data:
+		if da.id == id:
+			data.remove(da)
+
+
+
+
+===================================================================================================================================
+
+
+status codes and custom response and custom status code 
+
+1️⃣ JSONResponse
+
+JSONResponse is a class used to manually control the entire HTTP response — including:
+Status code
+Response body
+Headers
+
+package -> from fastapi.responses import JSONResponse
+
+Use JSONResponse when:
+✔ You want to return a custom status code dynamically
+✔ You want full control over the response
+✔ You don’t want FastAPI to auto-handle formatting
+✔ You want to return different response structures conditionally
+
+example 
+return JSONResponse(
+    status_code=409,
+    content={"message": "Book already exists"}
+)
+
+
+Don’t use JSONResponse when:
+You’re just returning normal success data
+You already set status_code in decorator
+You’re raising an error → use HTTPException instead
+
+
+-------------------------------------------------------------------------------------------
+2️⃣ HTTPException
+
+HTTPException is used to raise an HTTP error.
+
+It automatically:
+Stops execution
+Returns an error response
+Formats it properly
+
+Imported as:
+from fastapi import HTTPException
+
+Use HTTPException when:
+✔ Resource not found (404)
+✔ Unauthorized (401)
+✔ Bad request (400)
+✔ Validation or business rule error
+✔ Anything that should STOP execution immediately
+
+Example
+raise HTTPException(
+    status_code=404,
+    detail="Book not found"
+)
+
+This immediately stops the function.
+
+-----------------------------------------------------------------------------------------------
+3️⃣ response_model
+
+response_model is used to:
+✔ Control what gets returned
+✔ Automatically validate response
+✔ Automatically filter extra fields
+✔ Generate accurate Swagger docs
+
+Example:
+@app.get("/books", response_model=List[BookResponse])
+
+✅ Why it’s powerful
+
+If your database contains:
+
+{
+    "id": "123",
+    "title": "Python",
+    "author": "Akash",
+    "price": 500,
+    "internal_id": "secret123"
+}
+
+But your response_model does NOT include internal_id…
+FastAPI automatically removes it from the response 
+
+
+Always use response_model in production APIs.
+
+It:
+Protects sensitive fields
+Ensures consistent output
+Helps frontend developers
+Improves API documentation
+
+best practice → always use it.
+
+-----------------------------------------------------------------------------------------
+4️⃣ status_code=status.HTTP_201_CREATED
+
+This is just a clean way to define status codes using constants instead of numbers.
+
+Imported as:
+from fastapi import status
+
+Instead of:
+status_code=201
+You write:
+status_code=status.HTTP_201_CREATED
+
+✅ Why use it?
+✔ More readable
+✔ More professional
+✔ Avoids magic numbers
+✔ Self-documenting code
+
+Example
+@app.post("/books", status_code=status.HTTP_201_CREATED)
+
+
+This means:
+
+Whenever this endpoint succeeds → return 201
+
+
+---------------------------------------------------------------------------------------------------------
+
+When to Use What (Real-world Thinking)
+
+Situation					What to Use
+Resource created				status_code=HTTP_201_CREATED
+Resource not found				raise HTTPException(404)
+Validation failure				raise HTTPException(400)
+Custom success response with special status	JSONResponse
+Control response structure			response_model
+
+
+Practical Rule (Very Important)
+👉 Use HTTPException for errors
+👉 Use response_model always
+👉 Use status_code= in decorator for normal success
+👉 Use JSONResponse only when you need extra control
+
+In real production APIs:
+
+You rarely use JSONResponse
+
+You mostly use:
+response_model
+HTTPException
+status constants
+
+JSONResponse is more for special cases.

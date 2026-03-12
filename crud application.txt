@@ -1,0 +1,281 @@
+
+'''part 1'''
+from fastapi import FastAPI , status
+from pydantic import BaseModel
+from typing import TypeVar, Generic, Dict
+from fastapi import Request
+from fastapi.exceptions import HTTPException
+from fastapi.responses import JSONResponse
+from uuid import uuid4
+
+
+app = FastAPI()
+
+
+booksData : Dict[str,dict] ={}
+T = TypeVar("T")
+
+class APIResponseModel(BaseModel, Generic[T]):
+  success: bool
+  message: str
+  data: T
+class BookModel(BaseModel):
+  title: str
+  author: str
+  description: str
+  
+class BookResponseModel(BaseModel):
+  id:str
+  title: str
+  author: str
+  description: str
+  
+  
+'''part 2'''
+@app.exception_handler(HTTPException)
+def http_exception_handler(request:Request, exc:HTTPException):
+  return JSONResponse(
+    status_code=exc.status_code,
+    content={
+      "success": False,
+      "message": exc.detail,
+      "data": None
+    }
+  )
+
+'''part 3'''
+@app.get("/books", response_model=APIResponseModel[list[BookResponseModel]])
+def get_all_books():
+  return APIResponseModel(
+    success=True,
+    message="Books retrieved successfully",
+    data= list(booksData.values())
+  )
+  
+@app.get("/books/{book_id}", response_model=APIResponseModel[BookResponseModel])
+def get_book(book_id:str):
+  book = booksData.get(book_id)
+  if not book:
+    raise HTTPException(status_code=404, detail="Book not found")
+  return APIResponseModel(
+    success=True,
+    message="Book retrieved successfully",
+    data=book
+  )
+  
+@app.post("/books", response_model=APIResponseModel[BookResponseModel], status_code=status.HTTP_201_CREATED)
+def create_book(book:BookModel):
+  new_book_id = str(uuid4())
+  new_book = {
+    "id": new_book_id,
+    "title": book.title,
+    "author": book.author,
+    "description": book.description
+  }
+  booksData[new_book_id] = new_book
+  return APIResponseModel(
+    success=True,
+    message="Book created successfully",
+    data=new_book
+  )
+  
+
+@app.put("/books/{book_id}", response_model=APIResponseModel[BookResponseModel])
+def update_book(book_id:str, book:BookModel):
+  
+  if book_id not in booksData:
+    raise HTTPException(status_code=404, detail="Book not found")
+  
+  updated_book = {
+    "id": book_id,
+    "title": book.title,
+    "author": book.author,
+    "description": book.description
+  }
+  
+  booksData[book_id] = updated_book
+  return APIResponseModel(
+    success=True,
+    message="Book updated successfully",
+    data=updated_book
+  )
+  
+
+@app.delete("/books/{book_id}",response_model=APIResponseModel[None])
+def delete_book(book_id:str):
+  if book_id not in booksData:
+    raise HTTPException(status_code=404, detail="Book not found")
+  del booksData[book_id]
+  return APIResponseModel(
+    success=True,
+    message="Book deleted successfully",
+    data=None
+  )
+
+------------------------------------------------------------------------------------------------
+
+this is a proper production ready format of a crud application
+now since i have history of express and node i did some mistakes here which you should avoid 
+
+1) i placed try except block on every function and every where, this is not needed in fastapi , it does it internally and works perfectly without one. one big reason is that we raise an exception in case of errors or missing info then this exception will get caught in the except. now you may say that we will not raise exception and just return, but this is not how we should write fast api its not good practice and in complex cases this will fail
+
+2) making two classes one for object we get from the user and the one we return to the user is a very good practice. mind it the model we write in context to the format we get data from the user is only dependent on the user format is it in no way related to how we store the data. same for the model we used to verify for sending data to the user 
+3) here i have followed a uniform and fixed response format with msg success and data , although this is a ggod thing for enterprise apis and all but this is not a mandatary thing to do and if possible try to avoid in the microservices . we can very well go with the default versions instead of a custom response format.
+
+line by line explanation of the code 
+
+---------------------------------------
+
+part 1
+
+from fastapi import FastAPI , status
+from pydantic import BaseModel
+from typing import TypeVar, Generic, Dict
+from fastapi import Request
+from fastapi.exceptions import HTTPException
+from fastapi.responses import JSONResponse
+from uuid import uuid4
+Library/Class        | From Module            | Purpose
+---------------------------------------------------------------------------
+FastAPI              | fastapi               | Create the FastAPI application instance
+status               | fastapi               | Provides HTTP status code constants (200, 404, 201, etc.)
+BaseModel            | pydantic              | Create request and response data models. this is what allows us to create the pydantic class 
+TypeVar              | typing                | Create a generic type placeholder (for reusable models). this will set what type pf data  is received 
+Generic              | typing                | Allow a class to accept type parameters (used with TypeVar)
+Dict                 | typing                | Type hint for dictionary structures
+Request              | fastapi               | Represents the incoming HTTP request object
+HTTPException        | fastapi.exceptions    | Raise HTTP errors with custom status codes
+JSONResponse         | fastapi.responses     | Return custom JSON responses manually
+uuid4                | uuid                  | Generate unique UUID values (used for IDs)
+
+
+
+booksData : Dict[str,dict] ={} -> here we are just setting the booksData as dictionary with the proper format that the key will be a string and the value will a dictionary 
+
+T = TypeVar("T") -> here we are basically just setting the variable T to act like this will accept any type of value .
+
+ 
+class APIResponseModel(BaseModel, Generic[T]):
+  success: bool
+  message: str
+  data: T
+class BookModel(BaseModel):
+  title: str
+  author: str
+  description: str
+  
+class BookResponseModel(BaseModel):
+  id:str
+  title: str
+  author: str
+  description: str
+
+the APIResponseModel is the model that we have designed to send a custom response structure. BaseModel is what makes it a pydantic class. the Generic set what kind of parameter it will accept and that T which we talked about earlier allow us to set that it can accept in any format dict list str etc
+
+BookModel is the model which sets on how we expect the data from the user . this does the verification automatically becoz of it being a pydantic class
+BookResponseModel is the model which sets on how we send the data to the user . this does the verification automatically becoz of it being a pydantic class
+
+----------------------------------------------------------------------------------------
+
+part 2
+
+@app.exception_handler(HTTPException)
+def http_exception_handler(request:Request, exc:HTTPException):
+  return JSONResponse(
+    status_code=exc.status_code,
+    content={
+      "success": False,
+      "message": exc.detail,
+      "data": None
+    }
+  )
+
+this is where are making the custom exception handling for the HTTPException . when ever we raise the HTTPException it send this custom response structure of ours 
+we raise the exception normally only raise HTTPException(status_code=404, detail="Book not found")
+
+----------------------------------------------------------------
+
+part 3 
+this is where we write the functions for crud operation the logic you already know
+response_model -> set in which format we will send the response and we did "APIResponseModel[BookResponseModel]" so that the data is send following the BookResponseModel and the whole response is send as the structure in APIResponseModel.  
+status_code=status.HTTP_201_CREATED -> this basically sets that if success this will be the status code send 
+
+
+
+==================================================================================================
+
+model_dump() 
+
+this is a very important concept of the pydantic class . model_dump() converts a Pydantic model into a Python dictionary.
+
+new_book = {
+    "id": new_book_id,
+    "title": book.title,
+    "author": book.author,
+    "description": book.description
+  }
+
+instead of doing this we can just simply do this 
+
+new_book = book.model_dump()
+new_book["id"] = new_book_id
+
+since the book is a instance of the pydantic class so we can just use the model_dump() to automatically map it , this makes the code easier to read and smooth. 
+point to be noted is that the model of which the book is the instance does not have the attribute "id" so we are adding it separately
+
+some important features and concepts related to this 
+
+1) updated_data = book.model_dump()
+books[book_id] = {"id": book_id, **updated_data}
+
+That ** spreads the dictionary.
+
+2)Exclude fields
+book.model_dump(exclude={"author"})
+
+3)Include only some fields
+book.model_dump(include={"title"})
+
+4)Exclude None values
+book.model_dump(exclude_none=True)
+
+5)Important Difference
+
+model_dump() → Python dictionary
+model_dump_json() → JSON string
+
+Example:
+
+book.model_dump_json()
+
+Output:
+
+'{"title":"Atomic Habits","author":"James Clear"}'
+
+it’s a string.
+
+6) When You DON’T Need model_dump()
+
+In FastAPI, if you return a Pydantic model directly:
+return book
+
+FastAPI automatically serializes it.
+
+So you usually only need model_dump() when:
+a)Storing data manually
+b)Merging dictionaries
+c)Doing updates
+d)Preparing DB inserts
+
+
+7) One More Important Thing
+Since you're using generics and wrappers:
+return APIResponse(
+    success=True,
+    message="...",
+    data=book
+)
+You do NOT need model_dump() there.
+FastAPI handles it automatically.
+ 
+

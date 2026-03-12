@@ -1,0 +1,53 @@
+Introduction to fast api
+
+-> super fast 
+-> automatic api documentation
+-> easy to learn and use 
+-> type hint based validation 
+-> async support
+
+
+it is python based framework and we can run the server using uvicorn
+
+
+
+
+WHAT IS ROUTING IN FASTAPI  :->
+
+Routing means connecting a URL (web address) with a Python function.
+In FastAPI, routes are defined using decorators like:
+@app.get() - handles GET requests
+@app.post() - handles POST requests
+@app.put() - handles updates
+@app.delete() - handles deletes
+These HTTP methods decide how users will interact with your API. For example, GET is usually for fetching data, and POST is usually for sending (creating) new data.
+
+get -> fetch data 
+post -> create new data  
+put -> update data
+delete-> delete data
+
+
+
+
+dynamic parameters through path :-> 
+
+PATH PARAMETERS: DYNAMIC URLS , Path parameters let you capture values directly from the URL. , They are parts of the path inside {}.
+QUERY PARAMETERS: Query parameters are values that come after a ? in the URL. They are often used for things like filters or pagination.
+
+for any application the "/" is the base route every request to out backend will first hit here and then move to out own routes 
+
+
+
+setup steps for setting up the fastapi application :->
+
+1) create the virtual environment -> python3.13 -m venv myenv       -> myenv is the name for my virtual environment , it can be different 
+2) activate the virtual environment -> myenv\Scripts\activate
+3) create a requirement.txt file in the root file only , this will have all the libraries and all that we will need for the project -> for now the file will have two entries - fastapi and uvicorn. note that new entries should be each in a new line
+4) execute this requirement.txt file to install the things -> pip install -r requirement.txt
+5) check if installed properly -> pip list
+6) create the main.py -> this is the main server file 
+7) start the server -> uvicorn main:app --reload             -> main is the name of our server file which we will create like any backend here also we will have a server file main.py in which we will create the "app". --reload makes sure that the server restarts after we make a change, with this we would need to stop and restart the server. 
+
+
+note for testing the apis we can use postman etc but fastapi has its own testing. in the url we we start the server just type /docs , this will open the testing ui provided by swagger 

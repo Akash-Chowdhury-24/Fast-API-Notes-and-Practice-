@@ -1,0 +1,24 @@
+from fastapi import FastAPI              -> this is the fast api library
+from typing import Optional              -> this is used for dafaut value setting 
+
+app = FastAPI()       -> this creates our fast api application and stores it in the variable "app". that is y we do uvicorn main:app
+
+@app.get("/")         -> decoder with the http method and the endpoint , this is what will teel the application what the below function directs to
+async def root():	-> the function name can be anything 
+    return {"message": "Hello World"}
+  
+@app.get("/about")
+async def about():
+    return {"message": "This is a simple FastAPI application."}
+  
+@app.get("/hello/{name}")
+async def helloFunction(name: str):	-> we can see this is a case of parameters , the function parameter name and the url parameter name should match and 					   so should the data type , this data type prevents from uploading wrong type of parameter. of course the parameter 					   is a mandatory field
+    return {"message": f"Hello {name}!"}
+  
+@app.get("/queryhello")
+async def queryHelloFunction(name: str):  -> this is the case of query parameter, if the function has a parameter but the url has none this means that we are 					     referencing to a query parameter. of course the query parameter is a mandatory field. 
+    return {"message": f"Hello {name}!"}
+  
+@app.get("/defaulthello")
+async def defaultHelloFunction(name: Optional[str] = "World"): -> this is the case for parameters with default values in case they are not coming when our 								  endpoint is hit. 
+    return {"message": f"Hello {name}!"}

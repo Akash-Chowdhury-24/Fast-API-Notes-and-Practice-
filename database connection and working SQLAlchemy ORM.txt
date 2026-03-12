@@ -1,0 +1,284 @@
+SQL Alchemy is an ORM in python which helps us to place data into any SQL Database without writing any SQL query 
+
+earlier what we did is that we created a class and an object structure 
+
+class model(BaseModel):
+	id: str
+	title: str
+	author: str
+
+this will now be our database table
+
+and 
+{
+	"id": "sfwewer",
+	"title": "book1",
+	"author": "author1"
+} 
+
+this will be the rows for each table
+
+
+so this ORM converts the python classes to Tables and pythob objects or dict to rows
+
+
+we need to install two things sqlalchemy and pymysql
+
+---------------------------------------------------------------------------------------------
+
+create connection 
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
+
+
+MYSQLUSER = "root"
+MYSQLPASSWORD = "password"
+MYSQLLOCALHOST = "localhost"
+MYSQLPORT = 3306
+DATABASENAME = "test_db"
+
+
+database_url =  f"mysql+pymysql://{MYSQLUSER}:{MYSQLPASSWORD}@{MYSQLLOCALHOST}:{MYSQLPORT}/{DATABASENAME}"  
+'''example -> mysql+pymysql://root:password@localhost:3306/test_db '''
+
+
+engine = create_engine(database_url)
+
+SessionLocal = sessionmaker(bind=engine)
+
+Base = declarative_base()
+
+def get_db():
+	db = SessionLocal()
+	try :
+		yield db
+	finally : 
+		db.close()
+
+
+
+create_engine() → connects to MySQL
+SessionLocal → creates DB sessions
+Base → base class for all tables
+get_db -> this function will help us in calling the db and setting things up. this is basically a generator function
+SessionLocal -> opens the session or starts the session 
+close() -> close the session 
+
+
+for reference we will refer this file as database.py
+
+---------------------------------------------------------------------------------------------------
+
+create a model or the table for the database 
+
+
+from database import Base
+from sqlalchemy import Column, Integer, String
+
+
+class User(Base):
+	_tablename_ = "users"
+
+	id = Column(Integer, primary_key=True, index=True )
+	name = Column(String(255), nullable= False)
+	email = Column(String(255), unique=True)
+
+
+
+the User is the table structure
+
+_tablename_ -> this attribute sets the name of the table
+Column -> this set the name and attributes of the column 
+
+parameters accepted by this Column attribute 
+| Parameter                    | Purpose                                                                             |
+| ---------------------------- | ----------------------------------------------------------------------------------- |
+| `primary_key=True`           | Makes column the primary key (unique + not null + indexed + auto increment for int) |
+| `nullable=True/False`        | Allows or prevents NULL values                                                      |
+| `unique=True`                | Prevents duplicate values                                                           |
+| `index=True`                 | Creates a database index for faster search                                          |
+| `default=value`              | Sets a Python-side default value                                                    |
+| `server_default=value`       | Sets a database-level default value                                                 |
+| `autoincrement=True`         | Enables auto increment (mainly for Integer PK)                                      |
+| `ForeignKey("table.column")` | Creates foreign key relationship                                                    |
+| `onupdate=value`             | Automatically updates column when row updates                                       |
+| `comment="text"`             | Adds comment in database schema                                                     |
+| `name="column_name"`         | Custom database column name                                                         |
+| `doc="text"`                 | Documentation string for ORM use                                                    |
+| `insert_default=value`       | Default only during INSERT                                                          |
+| `info={}`                    | Stores custom metadata (not DB related)                                             |
+
+
+
+types or the data types of each column 
+
+| Type                        | Purpose                           |
+| --------------------------- | --------------------------------- |
+| `Integer`                   | Integer number (INT)              |
+| `BigInteger`                | Large integer (BIGINT)            |
+| `SmallInteger`              | Small integer (SMALLINT)          |
+| `String(length)`            | Variable-length string (VARCHAR)  |
+| `Text`                      | Large text field (TEXT)           |
+| `Boolean`                   | True/False value                  |
+| `Float`                     | Floating point number             |
+| `Numeric(precision, scale)` | Fixed precision decimal (DECIMAL) |
+| `Date`                      | Date only                         |
+| `DateTime`                  | Date and time                     |
+| `Time`                      | Time only                         |
+| `LargeBinary`               | Binary data (BLOB)                |
+| `Enum(...)`                 | Restricted fixed set of values    |
+| `JSON`                      | JSON column type                  |
+| `UUID`                      | UUID type (if supported)          |
+
+
+the first parameter should always be the type then the rest parameters can be in any order
+
+
+for this reference lets consider this file to be model.py
+--------------------------------------------------------------------------------------------------------------------------
+
+create the table 
+
+from database import Base,engine
+import model
+
+Base.metadata.create_all(bind=engine)
+
+this line creates all the tables which are written in the model.py 
+
+----------------------------------------------------------------------------------------------------------------------------
+
+crud operations add edit retrieve and delete 
+
+.commit() -> save the changes to the database 
+.refresh() -> update and refresh the table 
+
+db = SessionLocal()
+
+1) INSERT (Add Data)
+def add_user(name: str, email: str):
+    new_user = User(name=name, email=email)
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    print("User added:", new_user.id)
+
+the .add() function adds to the database
+
+2) GET ALL USERS
+def get_all_users():
+    users = db.query(User).all()
+
+.query(<table name>) -> allows us to write query
+.all() -> all data 
+
+
+3) GET BY ID
+def get_user_by_id(user_id: int):
+    user = db.query(User).filter(User.id == user_id).first()
+    print(user)
+
+.filter() -> used for applying condition and filtering out
+.first() -> gives the first occurrence 
+
+4) FILTER 
+a) Filter by email:
+def get_user_by_email(email: str):
+    user = db.query(User).filter(User.email == email).first()
+    print(user)
+
+b)Multiple conditions:
+from sqlalchemy import and_
+
+def filter_example(name: str, email: str):
+    user = db.query(User).filter(
+        and_(User.name == name, User.email == email)
+    ).first()
+    print(user)
+
+5) UPDATE
+def update_user(user_id: int, new_name: str):
+    user = db.query(User).filter(User.id == user_id).first()
+    
+    if user:
+        user.name = new_name
+        db.commit()
+        db.refresh(user)
+        print("Updated:", user.name)
+    else:
+        print("User not found")
+ 
+
+6) DELETE
+def delete_user(user_id: int):
+    user = db.query(User).filter(User.id == user_id).first()
+
+    if user:
+        db.delete(user)
+        db.commit()
+        print("User deleted")
+    else:
+        print("User not found")
+
+
+------------------------------------------------------------------------------------------- 
+
+some other functions which are important and widely used 
+
+1️⃣ Session Methods (db = SessionLocal())
+| Function              | Purpose                                                   |
+| --------------------- | --------------------------------------------------------- |
+| `add(obj)`            | Adds a new object (row) to the session                    |
+| `add_all([objs])`     | Adds multiple objects at once                             |
+| `commit()`            | Saves (persently writes) changes to the database          |
+| `rollback()`          | Reverts changes if an error occurs                        |
+| `refresh(obj)`        | Reloads object data from database                         |
+| `delete(obj)`         | Deletes a row from database                               |
+| `close()`             | Closes the database session                               |
+| `flush()`             | Sends changes to DB without committing                    |
+| `merge(obj)`          | Updates existing row or inserts if not present            |
+| `expire(obj)`         | Marks object as expired so it reloads from DB next access |
+| `bulk_save_objects()` | Fast bulk insert                                          |
+| `execute()`           | Runs raw SQL query                                        |
+
+
+2️⃣ Query Methods (db.query(Model))
+| Function                 | Purpose                                         |
+| ------------------------ | ----------------------------------------------- |
+| `query(Model)`           | Starts a query for a table                      |
+| `all()`                  | Returns all matching rows (list)                |
+| `first()`                | Returns first result or None                    |
+| `one()`                  | Returns exactly one result (error if 0 or many) |
+| `one_or_none()`          | Returns one result or None (error if many)      |
+| `filter(condition)`      | Adds WHERE condition                            |
+| `filter_by(field=value)` | Simple equality filter                          |
+| `get(primary_key)`       | Gets row by primary key                         |
+| `order_by(column)`       | Sorts results                                   |
+| `limit(n)`               | Limits number of rows                           |
+| `offset(n)`              | Skips first n rows                              |
+| `count()`                | Returns number of rows                          |
+| `join(Model)`            | Performs SQL JOIN                               |
+| `outerjoin(Model)`       | Performs LEFT JOIN                              |
+| `group_by(column)`       | Groups rows                                     |
+| `having(condition)`      | HAVING clause after GROUP BY                    |
+| `distinct()`             | Removes duplicate results                       |
+| `update({...})`          | Updates rows directly (query-level update)      |
+| `delete()`               | Deletes rows directly (query-level delete)      |
+
+
+3️⃣ Common Filter Operators
+| Operator           | Purpose                |
+| ------------------ | ---------------------- |
+| `==`               | Equal                  |
+| `!=`               | Not equal              |
+| `>`                | Greater than           |
+| `<`                | Less than              |
+| `>=`               | Greater or equal       |
+| `<=`               | Less or equal          |
+| `.like("%text%")`  | Pattern match          |
+| `.ilike("%text%")` | Case-insensitive match |
+| `.in_([list])`     | Value in list          |
+| `.between(a, b)`   | Between two values     |
+| `.is_(None)`       | IS NULL                |
+| `.isnot(None)`     | IS NOT NULL            |
