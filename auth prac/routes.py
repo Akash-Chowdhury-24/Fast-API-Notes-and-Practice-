@@ -52,7 +52,7 @@ async def get_all_users_route(
 async def get_user_by_id_route(
     user_id: str,
     db: Session = Depends(get_db),
-    # current_user=Depends(get_current_user),
+    current_user=Depends(get_current_user),
 ):
     return await get_user_by_id(db, user_id)
 

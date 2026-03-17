@@ -1,0 +1,130 @@
+Authentication
+
+in authentication we generally check passwords and verify users 
+so the basic concept is hashing password and dehashing them to check password for sign in sign up
+
+for password hashing and dehashing we use passlib[argon2]
+
+
+
+from passlib.context import CryptContext                            => this is the function that we are going to use to decrypt and encrypt the password
+
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")   => this is the context which will enable us to access the functions 
+
+def hash_password(password:str) -> str:
+    return pwd_context.hash(password)                               => hash() is use to hash the password    
+
+def verify_password(plain_password:str, hashed_password:str) -> bool:       => this "-> bool" and "-> str" just sets what that function will return. its a 									       extra layer of safety 
+    return pwd_context.verify(plain_password, hashed_password)      => verify() automatically decrypts the hashed password and matches it.
+
+
+
+
+
+
+Token
+
+this is a very imp concept , whenever a user logins or signups we send them a token which contains some info like maybe the email , role or any other kind of info which we later use for authorization. it is a encrypted string which when decoded gives the payload which has all the info which we stored in the token
+
+from datetime import datetime, timedelta
+from jose import jwt, JWTError
+
+SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"   => this is the secret key used for the encryption 
+ALGORITHM = "HS256"								  => this is the algorithm used for encryption 
+ACCESS_TOKEN_EXPIRE_MINUTES = 30						  => this is the expiry limit
+
+
+def create_access_token(user_data: dict) -> str:
+    to_encode = user_data.copy()						  => here we are copying the data we want to store in the token
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})						  => just storing the expiry in the token
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)		  => here we generate and send the token
+
+
+def decode_access_token(token: str) -> dict | None:
+    """Decode and verify JWT; returns payload dict or None if invalid."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])		  => this is decoding the token and then sending the payload 
+        return payload
+    except JWTError:
+        return None
+
+
+
+
+authentication 
+this is basically after decoding the token we can filter responses on the basis of the role in the token
+
+class TokenPayload(BaseModel):
+    id: str
+    email: str
+    name: str
+    role: str
+
+
+def get_current_user(request: Request) -> TokenPayload:
+
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = auth_header[len("Bearer "):].strip()
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    payload = decode_access_token(token)
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    try:
+        return TokenPayload(
+            id=payload["id"],
+            email=payload["email"],
+            name=payload["name"],
+            role=payload["role"],
+        )
+    except KeyError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+here we are just getting the token from the authentication header , and decoding it to get the payload with proper error handling . TokenPayload class is just a good practice so that you know and control what is coming and because of the pydantic class the errors are handled automatically 
+
+now we can just use this function anywhere we want to get the token payload . this is much cleaner and organized way to do. how to use this function we will simply use the Depends(). dont think that Depends can only be used in a route function it can be used in any function we deem necessary , even in utility functions 
+like if i want that only a admin can access a specific route i can create a admin only check utility function and use that in the routes 
+example 
+def require_admin(current_user: TokenPayload = Depends(get_current_user)) -> TokenPayload:
+
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin role required",
+        )
+    return current_user
+
+@router.get("/users", response_model=APIResponseModel[List[UserResponseModel]])
+async def get_all_users_route(
+    db: Session = Depends(get_db),
+    current_user=Depends(require_admin),
+):
+    return await get_all_users(db)
+
+
+So What Depends() actually does
+Depends() is FastAPI’s Dependency Injection system
+It tells FastAPI:
+“Before running this function, execute another function and give me its result.”
