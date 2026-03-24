@@ -1,0 +1,157 @@
+in sql databases we have generally 4 types of relationships 
+
+one to one 
+many to many 
+one to many
+many to many
+
+
+for example 
+we are taking two tables Organizations and Users . note -> both tables may have other columns 
+
+
+✅ 1. MANY → ONE and ONE → MANY
+
+Many organizations belong to one user
+
+🔧 Implementation
+class Organizations(Base):
+    owner_id = Column(String, ForeignKey("users.id"))
+    owner = relationship("Users", back_populates="organizations")
+
+
+class Users(Base):
+    organizations = relationship("Organizations", back_populates="owner")
+
+
+🧠 Result:
+org.owner → single user
+user.organizations → list of orgs
+
+👉 This is:
+
+Organizations → Users = many-to-one
+Users → Organizations = one-to-many
+
+
+
+here the combination of the ForeignKey and relationship is what defines the one to many and many to one DB relationships 
+relationship("Users", back_populates="organizations")  -> here the first parameter is the class name of the model we want to create the relationship and the back_populates="organizations" is for the column which we want to target and populate the data from
+ForeignKey("users.id") -> but here we use the table name
+
+
+
+✅ 2. ONE → ONE
+✔️ Meaning:
+One user owns exactly one organization
+🔧 Changes needed:
+class Organizations(Base):
+    owner_id = Column(String, ForeignKey("users.id"), unique=True)
+    owner = relationship("Users", back_populates="organization")
+
+
+class Users(Base):
+    organization = relationship("Organizations", back_populates="owner", uselist=False)
+🧠 Key Points:
+unique=True → ensures only one org per user
+uselist=False → tells SQLAlchemy it's not a list therefore making sure that only that the user can have only one organization 
+🧠 Result:
+user.organization → single object
+org.owner → single object
+
+👉 This becomes one-to-one
+
+
+
+✅ 3. MANY ↔ MANY (New Scenario)
+✔️ Meaning:
+Users can belong to multiple organizations
+Organizations can have multiple users
+🔧 Add Association Table
+from sqlalchemy import Table
+
+user_organization = Table(
+    "user_organization",
+    Base.metadata,
+    Column("user_id", String, ForeignKey("users.id")),
+    Column("org_id", String, ForeignKey("organizations.id"))
+)
+🔧 Update Models
+class Users(Base):
+    organizations = relationship(
+        "Organizations",
+        secondary=user_organization,
+        back_populates="users"
+    )
+
+
+class Organizations(Base):
+    users = relationship(
+        "Users",
+        secondary=user_organization,
+        back_populates="organizations"
+    )
+🧠 Result:
+user.organizations → list
+org.users → list
+
+
+
+here for many to many we need to create a association table . we can create them in two ways , the normal way in which we are creating tables like before and by using the Table()
+
+normal method -> use when you want to have more columns apart from the relationship
+class UserOrganization(Base):
+    __tablename__ = "user_organization"
+
+    user_id = Column(String, ForeignKey("users.id"), primary_key=True)
+    org_id = Column(String, ForeignKey("organizations.id"), primary_key=True)
+
+    # Optional extra fields
+    role = Column(String)
+    joined_at = Column(DateTime)  
+
+then in this case the mother tables will be like 
+class Users(Base):
+    __tablename__ = "users"
+
+    id = Column(String, primary_key=True)
+
+    user_organizations = relationship(
+        "UserOrganization",
+        back_populates="user"
+    )
+
+class Organizations(Base):
+    __tablename__ = "organizations"
+
+    id = Column(String, primary_key=True)
+
+    user_organizations = relationship(
+        "UserOrganization",
+        back_populates="organization"
+    )
+
+
+Table() -> use when you only want the relationship 
+user_organization = Table(
+    "user_organization",
+    Base.metadata,
+    Column("user_id", String, ForeignKey("users.id")),
+    Column("org_id", String, ForeignKey("organizations.id"))
+)
+
+and in this case the mother tables will be 
+
+class Users(Base):
+    organizations = relationship(
+        "Organizations",
+        secondary=user_organization,
+        back_populates="users"
+    )
+
+class Organizations(Base):
+    users = relationship(
+        "Users",
+        secondary=user_organization,
+        back_populates="organizations"
+    )

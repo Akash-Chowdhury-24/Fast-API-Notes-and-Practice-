@@ -24,6 +24,8 @@ def verify_password(plain_password:str, hashed_password:str) -> bool:       => t
 
 Token
 
+python-jose[cryptography] is the library needed
+
 this is a very imp concept , whenever a user logins or signups we send them a token which contains some info like maybe the email , role or any other kind of info which we later use for authorization. it is a encrypted string which when decoded gives the payload which has all the info which we stored in the token
 
 from datetime import datetime, timedelta
