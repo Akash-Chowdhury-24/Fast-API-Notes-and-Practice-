@@ -5,6 +5,11 @@ many to many
 one to many
 many to many
 
+note -> here you will see three major terms 
+relationship ()  -> this will create the relationship btw the tables and will allow you to get the related object of the table which matches with the foreign key . this field is not created in the table that is it will not be a column but you can access the specific object(data) for the foreign key of the targeted table. 
+back_populates = ""  -> this will update and sync up both the connected tables that is if you update the project table with a new project, this will automatically update the user table by adding the new project to that particular user 
+ForeingKey()  -> this will create a new column and will tell the sql that is field is reference to another table so that the sql can apply the referential integrity
+
 
 for example 
 we are taking two tables Organizations and Users . note -> both tables may have other columns 
@@ -17,7 +22,7 @@ Many organizations belong to one user
 🔧 Implementation
 class Organizations(Base):
     owner_id = Column(String, ForeignKey("users.id"))
-    owner = relationship("Users", back_populates="organizations")
+    owner = relationship("Users", back_populates="organizations")    -> so org.owner will give me the data of the user from the users table 										whose id same as the ForeignKey 
 
 
 class Users(Base):
@@ -36,7 +41,7 @@ Users → Organizations = one-to-many
 
 
 here the combination of the ForeignKey and relationship is what defines the one to many and many to one DB relationships 
-relationship("Users", back_populates="organizations")  -> here the first parameter is the class name of the model we want to create the relationship and the back_populates="organizations" is for the column which we want to target and populate the data from
+relationship("Users", back_populates="organizations")  -> here the first parameter is the class name of the model we want to create the relationship and the back_populates="organizations" is for the column which we want to target
 ForeignKey("users.id") -> but here we use the table name
 
 
